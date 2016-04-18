@@ -15,7 +15,8 @@ import datetime
 import unicodedata
 import SimpleDownloader
 import requests
-
+import pickle
+from operator import itemgetter
 familyFilter = "1"
 socket.setdefaulttimeout(60)
 pluginhandle = int(sys.argv[1])
@@ -23,7 +24,7 @@ addon = xbmcaddon.Addon()
 addonID = addon.getAddonInfo('id')
 channelFavsFile = xbmc.translatePath("special://profile/addon_data/"+addonID+"/"+addonID+".favorites")
 familyFilterFile = xbmc.translatePath("special://profile/addon_data/"+addonID+"/family_filter_off")
-
+cookie_file = xbmc.translatePath("special://profile/addon_data/"+addonID+"/cookies")
 if os.path.exists(familyFilterFile):
     familyFilter = "0"
 
@@ -232,7 +233,7 @@ def listUsers(url):
 
 
 def listLive(url):
-    print 'live url ',url
+    #print 'live url ',url
     content = getUrl(url)
     content = json.loads(content)
     for item in content['list']:
@@ -258,122 +259,99 @@ def search():
         listVideos(urlMain+"/videos?fields=description,duration,id,owner.username,taken_time,thumbnail_large_url,title,views_total&search="+search_string+"&sort=relevance&limit="+itemsPerPage+"&family_filter="+familyFilter+"&localization="+language+"&page=1")
 
 
-def playVideo(id):
-    listitem = xbmcgui.ListItem(path=getStreamUrl(id))
-    xbmcplugin.setResolvedUrl(pluginhandle, True, listitem)
-
-
-def getStreamUrl(id):
-    content = getUrl2("http://www.dailymotion.com/embed/video/"+id)
-    if content.find('"statusCode":410') > 0 or content.find('"statusCode":403') > 0:
-        xbmc.executebuiltin('XBMC.Notification(Info:,'+translation(30022)+' (DailyMotion)!,5000)')
-        return ""
-    
+def playVideo(id,live=False):
+    if live:
+        url=getStreamUrl(id,live=True)
     else:
-        get_json_code = re.compile(r'dmp\.create\(document\.getElementById\(\'player\'\),\s*([^;]+)').findall(content)[0]
-        get_json_code = get_json_code[:len(get_json_code)-1]
-        
-        cc= json.loads(get_json_code)['metadata']['qualities']  #['380'][0]['url']
-        print cc
-        if '1080' in cc.keys():
-            #print 'found hd'
-            return cc['1080'][0]['url']
-        elif '720' in cc.keys():
-            return cc['720'][0]['url']
-        elif '480' in cc.keys():
-            return cc['480'][0]['url']
-        elif '380' in cc.keys():
-            return cc['380'][0]['url']
-        elif '240' in cc.keys():
-            return cc['240'][0]['url']
-        elif 'auto' in cc.keys():
-            return cc['auto'][0]['url']
-        else:
-            xbmc.executebuiltin('XBMC.Notification(Info:, No playable Link found (DailyMotion)!,5000)')
-        
-        
-        
-        
-        
-        #matchFullHD = re.compile('"stream_h264_hd1080_url":"(.+?)"', re.DOTALL).findall(content)
-        #matchHD = re.compile('"stream_h264_hd_url":"(.+?)"', re.DOTALL).findall(content)
-        #matchHQ = re.compile('"stream_h264_hq_url":"(.+?)"', re.DOTALL).findall(content)
-        #matchSD = re.compile('"stream_h264_url":"(.+?)"', re.DOTALL).findall(content)
-        #matchLD = re.compile('"stream_h264_ld_url":"(.+?)"', re.DOTALL).findall(content)
-        #url = ""
-        #if matchFullHD and maxVideoQuality == "1080p":
-        #    url = urllib.unquote_plus(matchFullHD[0]).replace("\\", "")+'&redirect=0'
-        #elif matchHD and (maxVideoQuality == "720p" or maxVideoQuality == "1080p"):
-        #    url = urllib.unquote_plus(matchHD[0]).replace("\\", "")+'&redirect=0'
-        #elif matchHQ:
-        #    url = urllib.unquote_plus(matchHQ[0]).replace("\\", "")+'&redirect=0'
-        #elif matchSD:
-        #    url = urllib.unquote_plus(matchSD[0]).replace("\\", "")+'&redirect=0'
-        #elif matchLD:
-        #    url = urllib.unquote_plus(matchLD[0]).replace("\\", "")+'&redirect=0'
-        #print 'dmotion getStreamUrl url::',url
-        #return url
+        url = getStreamUrl(id)
+    print url
+    if url and not '.f4mTester' in url:
+        #print 'path found to beeeeeeeeeeee' , url
+        listitem = xbmcgui.ListItem(path=url)
+        xbmcplugin.setResolvedUrl(pluginhandle, True, listitem)    
 
-
-def playLiveVideo(id):
-    #id = 'x1sh6ok'
-    content = getUrl2("http://www.dailymotion.com/sequence/"+id)
-    headers = {'User-Agent': 'Mozilla/5.0 (Windows NT 6.1; WOW64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/34.0.1847.137 Safari/537.36'}
-    
-    if content.find('"statusCode":410') > 0 or content.find('"statusCode":403') > 0:
-        xbmc.executebuiltin('XBMC.Notification(Info:,'+translation(30022)+' (DailyMotion)!,5000)')
+    elif url:
+        xbmc.executebuiltin('XBMC.RunPlugin('+url+')')
     else:
-        #matchFullHD = re.compile('"hd1080URL":"(.+?)"', re.DOTALL).findall(content)
-        #matchHD = re.compile('"hd720URL":"(.+?)"', re.DOTALL).findall(content)
-        #matchHQ = re.compile('"hqURL":"(.+?)"', re.DOTALL).findall(content)
-        #matchSD = re.compile('"sdURL":"(.+?)"', re.DOTALL).findall(content)
-        #matchLD = re.compile('"video_url":"(.+?)"', re.DOTALL).findall(content)
-        
-        matchhds = re.compile('autoURL":"(.+?)"', re.DOTALL).findall(content)
-        #print '''__________________________________________________________________'''
-        #print matchhds
-        url = ""
-        hdsurl = ""
-        
-        #if matchFullHD and maxVideoQuality == "1080p":
-        #    url = urllib.unquote_plus(matchFullHD[0]).replace("\\", "")+'&redirect=0'
-        #elif matchHD and (maxVideoQuality == "720p" or maxVideoQuality == "1080p"):
-        #    url = urllib.unquote_plus(matchHD[0]).replace("\\", "")+'&redirect=0'
-        #elif matchHQ:
-        #    url = urllib.unquote_plus(matchHQ[0]).replace("\\", "")+'&redirect=0'
-        #elif matchSD:
-        #    url = urllib.unquote_plus(matchSD[0]).replace("\\", "")+'&redirect=0'
-        if matchhds:
-            hdsurl = urllib.unquote_plus(matchhds[0]).replace("\\", "")+'&redirect=0'
-            #print 'hdsurl is:' ,hdsurl
-            if 'hds' in hdsurl :
-                hdsurl = hdsurl.replace('?protocol=hds','?protocol=hls')
-                req = requests.get(hdsurl, headers=headers, allow_redirects=False)
-                final_url = re.compile('.*').findall(req.text)[0]
-                print 'final_url',final_url
-                if not '.m3u8?' in final_url:
-                    xbmc.executebuiltin('XBMC.Notification(Info:,Channel may not be [COLOR yellow] LIVE [/COLOR] (DailyMotion)! Try again,5000)')
-                else:
-                    listitem = xbmcgui.ListItem(path=final_url)
-                    xbmcplugin.setResolvedUrl(pluginhandle, True, listitem)                
-                #url = req.headers.get('Location')
-            elif 'mnft?' in hdsurl:
-                xbmc.executebuiltin('XBMC.Notification(Info:,Channel is [COLOR yellow] NOT LIVE [/COLOR] (DailyMotion)!,5000)')
-        #elif matchLD:
-        #    url = urllib.unquote_plus(matchSD2[0]).replace("\\", "")        
-       
-        else:
-            url = getUrl(url)
-            get_link = json.loads(url)
-            feed = get_link['alternates']
-            for i in feed:
-                name = str(i['name'])
-                if name == '720':
-                    url = i['template']
-                    print url
-                    break
-            listitem = xbmcgui.ListItem(path=url)
-            xbmcplugin.setResolvedUrl(pluginhandle, True, listitem)
+        print 'No playable url found'
+
+def BW_choice(stream):
+    bandwidth =[]
+    if re.search('BANDWIDTH', stream) :
+        print 'Getting bandwidth'
+        needle = "BANDWIDTH=(\d+)\d{3}[^\n]*\W+([^\n]+.m3u8[^\n\r]*)"
+        bw_url = re.compile(needle,re.DOTALL|re.IGNORECASE).findall(stream)
+    elif re.search('RESOLUTION', stream):
+        needle = 'RESOLUTION=(\d+)x\d{3}[^\n]*\W+([^\n]+.m3u8[^\n\r]*)'
+        bw_url = re.compile(needle).findall(stream)
+    if bw_url :
+        newlist =  sorted(bw_url, key=itemgetter(0),reverse=True)
+        return newlist[0] [1].split('#cell')[0]
+def getStreamUrl(id,live=False):
+    if familyFilter == "1":
+        ff = "on"
+    else:
+        ff = "off"
+    print 'The url is ::',url
+    headers = {'User-Agent':'Android'}
+    cookie = {'Cookie':"lang="+language+"; family_filter="+ff}
+    r = requests.get("http://www.dailymotion.com/player/metadata/video/"+id,headers=headers,cookies=cookie)
+    content = r.json()
+    if content.get('error') is not None:
+        Error = 'DailyMotion Says:[COLOR yellow]%s[/COLOR]' %(content['error']['title'])
+        xbmc.executebuiltin('XBMC.Notification(Info:,'+ Error +' ,5000)')
+        return
+    else:
+
+        cc= content['qualities']  #['380'][0]['url']
+           
+        m_url = ''
+        other_playable_url = []
+        for source,auto in cc.items():
+            print source 
+            for m3u8 in auto:
+                m_url = m3u8.get('url',None)
+                if m_url:
+                    if not live:
+                        if  source == '1080':
+                            return m_url        
+                
+                        elif source == '720': #720 found no more iteration need
+                            return m_url
+                        elif source == '480': #send cookie for mp4
+                            return m_url+'|Cookie='+r.headers['set-cookie']
+                        elif source == '380': #720 found no more iteration need
+                            return m_url+'|Cookie='+r.headers['set-cookie']
+                        elif source == '240': #720 found no more iteration need
+                            return m_url+'|Cookie='+r.headers['set-cookie']
+                         
+                        elif '.mnft' in m_url:
+                            continue
+                         
+                    else:
+                        if '.m3u8?auth' in m_url:
+                            m_url = m_url.split('?auth=')
+                            the_url = m_url[0] + '?redirect=0&auth=' + urllib.quote(m_url[1])
+                            rr = requests.get(the_url,cookies=r.cookies.get_dict() ,headers=headers)
+                            if rr.headers.get('set-cookie'):
+                                print 'adding cookie to url'
+                                return rr.text.split('#cell')[0]+'|Cookie='+rr.headers['set-cookie']
+                            else:
+                                return rr.text.split('#cell')[0]
+                    other_playable_url.append(m_url) 
+        if len(other_playable_url) >0: # probable not needed only for last resort
+            for m_url in other_playable_url:
+                if '.m3u8?auth' in m_url:
+                    sep_url = m_url.split('?auth=')
+                    the_url = sep_url[0] + '?redirect=0&auth=' + urllib.quote(sep_url[1])
+                    rr = requests.get(the_url,cookies=r.cookies.get_dict() ,headers=headers)
+                    if rr.headers.get('set-cookie'):
+                        print 'adding cookie to url'
+                        return rr.text.split('#cell')[0]+'|Cookie='+rr.headers['set-cookie']
+                    else:
+                        return rr.text.split('#cell')[0]
+                    
+      
 
 
 def queueVideo(url, name):
@@ -491,7 +469,7 @@ def translation(id):
 
 def getUrl(url):
     req = urllib2.Request(url)
-    req.add_header('User-Agent', 'Mozilla/5.0 (Windows NT 6.1; rv:22.0) Gecko/20100101 Firefox/22.0')
+    req.add_header('User-Agent', 'Android')
     #req.add_header('Accept:', 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8')
     #req.add_header('Accept-Encoding:', 'gzip, deflate')
     response = urllib2.urlopen(req)
@@ -505,13 +483,12 @@ def getUrl2(url):
         ff = "on"
     else:
         ff = "off"
-    req = urllib2.Request(url)
-    req.add_header('User-Agent', 'Mozilla/5.0 (Windows NT 6.1; rv:22.0) Gecko/20100101 Firefox/22.0')
-    req.add_header('Cookie', "lang="+language+"; family_filter="+ff)
-    response = urllib2.urlopen(req)
-    link = response.read()
-    response.close()
-    return link
+    print 'The url is ::',url
+    headers = {'User-Agent':'Android'}
+    cookie = {'Cookie':"lang="+language+"; family_filter="+ff}
+    r = requests.get(url,headers=headers,cookies=cookie)
+    return r.text
+
 
 
 def parameters_string_to_dict(parameters):
@@ -632,15 +609,10 @@ elif mode == 'sortUsers1':
 elif mode == 'sortUsers2':
     sortUsers2(url)
 elif mode == 'playVideo':
-    #if url.startswith('plugin'):
-    #    print 'url @613',url
-    #
-    #    #liz.setProperty('IsPlayable', 'true')
-    #else:    
-    print url
+    
     playVideo(url)
 elif mode == 'playLiveVideo':
-    playLiveVideo(url)
+    playVideo(url,live=True)
 
 elif mode == 'playArte':
     playArte(url)
