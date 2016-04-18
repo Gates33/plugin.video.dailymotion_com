@@ -1,3 +1,5 @@
+2.1.6
+- default.py from Boscorelly (http://forum.kodi.tv/showthread.php?tid=142626&pid=2177681#pid2177681)
 2.1.5
 - Fixed Regexp for video with a ")" in the title
 2.1.4
