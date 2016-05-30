@@ -35,7 +35,8 @@ forceViewModeNew = addon.getSetting("forceViewModeNew") == "true"
 viewModeNew = str(addon.getSetting("viewModeNew"))
 maxVideoQuality = addon.getSetting("maxVideoQuality")
 downloadDir = addon.getSetting("downloadDir")
-qual = ["480p", "720p", "1080p"]
+# qual = ["480p", "720p", "1080p"]
+qual = ["480", "720", "1080"]
 maxVideoQuality = qual[int(maxVideoQuality)]
 language = addon.getSetting("language")
 languages = ["en_EN", "ar_ES", "au_EN", "be_FR", "be_NL", "br_PT", "ca_EN", "ca_FR", "de_DE", "es_ES", "es_CA", "gr_EL", "fr_FR", "in_EN", "ie_EN", "it_IT", "mx_ES", "ma_FR", "nl_NL", "at_DE", "pl_PL", "pt_PT", "ru_RU", "ro_RO", "ch_FR", "ch_DE", "ch_IT", "tn_FR", "tr_TR", "en_GB", "en_US", "vn_VI", "jp_JP", "cn_ZH"]
@@ -302,29 +303,28 @@ def getStreamUrl(id,live=False):
         xbmc.executebuiltin('XBMC.Notification(Info:,'+ Error +' ,5000)')
         return
     else:
-
         cc= content['qualities']  #['380'][0]['url']
-           
+
+        cc = cc.items()
+        cc = sorted(cc, reverse=True)
+ 
         m_url = ''
         other_playable_url = []
-        for source,auto in cc.items():
-            print source 
-            for m3u8 in auto:
-                m_url = m3u8.get('url',None)
+
+        for source,json_source in cc:
+
+            for item in json_source:
+                m_url = item.get('url',None)
+                xbmc.log("DILYMOTION_Gates - m_url = %s" %m_url)
                 if m_url:
                     if not live:
-                        if  source == '1080':
-                            return m_url        
-                
-                        elif source == '720': #720 found no more iteration need
-                            return m_url
-                        elif source == '480': #send cookie for mp4
-                            return m_url+'|Cookie='+r.headers['set-cookie']
-                        elif source == '380': #720 found no more iteration need
-                            return m_url+'|Cookie='+r.headers['set-cookie']
-                        elif source == '240': #720 found no more iteration need
-                            return m_url+'|Cookie='+r.headers['set-cookie']
-                         
+
+                        if source == "auto" :
+                            continue
+
+                        elif  int(source) <= int(maxVideoQuality) :
+                            return m_url       
+
                         elif '.mnft' in m_url:
                             continue
                          
