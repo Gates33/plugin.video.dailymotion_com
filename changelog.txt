@@ -1,3 +1,5 @@
+2.2
+ - Fixe video quality and max video quality
 2.1.6
 - default.py from Boscorelly (http://forum.kodi.tv/showthread.php?tid=142626&pid=2177681#pid2177681)
 2.1.5
